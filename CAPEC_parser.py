@@ -46,6 +46,8 @@ def main():
 
     # Создание новой таблицы для результатов
     results = []
+    unique_capecs = set()  # Для отслеживания уникальных CAPEC
+    row_number = 1  # Нумерация строк
 
     # Обработка каждой строки в output.xlsx
     for index, row in output_df.iterrows():
@@ -59,11 +61,14 @@ def main():
             if pd.notna(cwe_id):  # Проверяем, что CWE не пустое
                 capecs = get_capec(cwe_id.split('-')[1])  # Извлекаем номер CWE
                 for capec in capecs:
-                    results.append({
-                        '№': index + 1,
-                        'CAPEC': capec[0],
-                        'Наименование атаки': capec[1]
-                    })
+                    if capec[0] not in unique_capecs:  # Проверяем, что CAPEC уникален
+                        unique_capecs.add(capec[0])
+                        results.append({
+                            '№': row_number,
+                            'CAPEC': capec[0],
+                            'Наименование атаки': capec[1]
+                        })
+                        row_number += 1  # Увеличиваем номер строки
 
     # Сохранение результатов в новый Excel файл
     results_df = pd.DataFrame(results)
