@@ -10,11 +10,16 @@ def parse_excel(excel_file):
     data = []
 
     for row in worksheet.iter_rows(min_row=2, values_only=True):
-        data.append({
-            'Идентификатор': row[0],  # Идентификатор уязвимости
-            'Наименование уязвимости': row[1],  # Наименование уязвимости
-            'Тип ошибки CWE': row[-1]  # Тип ошибки CWE (последняя колонка)
-        })
+        # Разделяем типы ошибок CWE по запятой и убираем лишние пробелы
+        cwe_types = [cwe.strip() for cwe in str(row[-1]).split(',')]
+
+        # Для каждого типа ошибки CWE создаём отдельную запись
+        for cwe in cwe_types:
+            data.append({
+                'Идентификатор': row[0],  # Идентификатор уязвимости
+                'Наименование уязвимости': row[1],  # Наименование уязвимости
+                'Тип ошибки CWE': cwe  # Тип ошибки CWE
+            })
 
     return pd.DataFrame(data)
 
@@ -87,46 +92,47 @@ def main():
         print(f"Обработка строки {index + 1} из {total_rows}...")
 
         # Поиск соответствующей строки в vullist_df
-        cwe_row = vullist_df[vullist_df['Идентификатор'] == bdu]
-        if not cwe_row.empty:
-            cwe_id = cwe_row.iloc[0]['Тип ошибки CWE']
-            if pd.notna(cwe_id):  # Проверяем, что CWE не пустое
-                print(f"Найден CWE: {cwe_id}")
-                cwe_number = cwe_id.split('-')[1]  # Извлекаем номер CWE
+        cwe_rows = vullist_df[vullist_df['Идентификатор'] == bdu]
+        if not cwe_rows.empty:
+            for _, cwe_row in cwe_rows.iterrows():
+                cwe_id = cwe_row['Тип ошибки CWE']
+                if pd.notna(cwe_id):  # Проверяем, что CWE не пустое
+                    print(f"Найден CWE: {cwe_id}")
+                    cwe_number = cwe_id.split('-')[1]  # Извлекаем номер CWE
 
-                # Получаем CAPEC для данного CWE
-                capecs = get_capec(cwe_number)
-                print(f"Найдено CAPEC: {len(capecs)}")
+                    # Получаем CAPEC для данного CWE
+                    capecs = get_capec(cwe_number)
+                    print(f"Найдено CAPEC: {len(capecs)}")
 
-                # Группируем CAPEC по Likelihood Of Attack
-                high_capecs = []
-                medium_capecs = []
-                low_capecs = []
-                no_chance_capecs = []
+                    # Группируем CAPEC по Likelihood Of Attack
+                    high_capecs = []
+                    medium_capecs = []
+                    low_capecs = []
+                    no_chance_capecs = []
 
-                for capec in capecs:
-                    likelihood = get_likelihood(capec)
-                    if likelihood == "High":
-                        high_capecs.append(capec)
-                    elif likelihood == "Medium":
-                        medium_capecs.append(capec)
-                    elif likelihood == "Low":
-                        low_capecs.append(capec)
-                    else:
-                        no_chance_capecs.append(capec)
+                    for capec in capecs:
+                        likelihood = get_likelihood(capec)
+                        if likelihood == "High":
+                            high_capecs.append(capec)
+                        elif likelihood == "Medium":
+                            medium_capecs.append(capec)
+                        elif likelihood == "Low":
+                            low_capecs.append(capec)
+                        else:
+                            no_chance_capecs.append(capec)
 
-                # Добавляем результаты в таблицу
-                results.append({
-                    '№': index + 1,
-                    'BDU': bdu,
-                    'CWE': cwe_id,
-                    'CAPEC High': ', '.join(high_capecs),
-                    'CAPEC Medium': ', '.join(medium_capecs),
-                    'CAPEC Low': ', '.join(low_capecs),
-                    'No chance': ', '.join(no_chance_capecs)
-                })
-            else:
-                print(f"CWE не найден для BDU: {bdu}")
+                    # Добавляем результаты в таблицу
+                    results.append({
+                        '№': index + 1,
+                        'BDU': bdu,
+                        'CWE': cwe_id,
+                        'CAPEC High': ', '.join(high_capecs),
+                        'CAPEC Medium': ', '.join(medium_capecs),
+                        'CAPEC Low': ', '.join(low_capecs),
+                        'No chance': ', '.join(no_chance_capecs)
+                    })
+                else:
+                    print(f"CWE не найден для BDU: {bdu}")
         else:
             print(f"BDU {bdu} не найден в vullist.xlsx")
 
