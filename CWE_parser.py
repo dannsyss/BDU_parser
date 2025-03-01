@@ -19,8 +19,16 @@ def parse_excel(excel_file):
     return pd.DataFrame(data)
 
 
+# Кэш для хранения CAPEC и их уровней угроз
+capec_cache = {}
+
+
 # Функция для получения CAPEC по CWE
 def get_capec(cwe_id):
+    if cwe_id in capec_cache:
+        print(f"Используем кэш для CWE: {cwe_id}")
+        return capec_cache[cwe_id]
+
     url = f"https://cwe.mitre.org/data/definitions/{cwe_id}.html"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -33,18 +41,24 @@ def get_capec(cwe_id):
             capec_id = cols[0].text.strip()
             attack_name = cols[1].text.strip()
             capecs.append(capec_id)
+        capec_cache[cwe_id] = capecs  # Сохраняем в кэш
         return capecs
     return []
 
 
 # Функция для получения Likelihood Of Attack по CAPEC
 def get_likelihood(capec_id):
+    if capec_id in capec_cache:
+        print(f"Используем кэш для CAPEC: {capec_id}")
+        return capec_cache[capec_id]
+
     url = f"https://capec.mitre.org/data/definitions/{capec_id.split('-')[1]}.html"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
     likelihood_div = soup.find('div', id='Likelihood_Of_Attack')
     if likelihood_div:
         likelihood = likelihood_div.find('div', class_='detail').text.strip()
+        capec_cache[capec_id] = likelihood  # Сохраняем в кэш
         return likelihood
     return "No chance"
 
@@ -78,7 +92,10 @@ def main():
             cwe_id = cwe_row.iloc[0]['Тип ошибки CWE']
             if pd.notna(cwe_id):  # Проверяем, что CWE не пустое
                 print(f"Найден CWE: {cwe_id}")
-                capecs = get_capec(cwe_id.split('-')[1])  # Извлекаем номер CWE
+                cwe_number = cwe_id.split('-')[1]  # Извлекаем номер CWE
+
+                # Получаем CAPEC для данного CWE
+                capecs = get_capec(cwe_number)
                 print(f"Найдено CAPEC: {len(capecs)}")
 
                 # Группируем CAPEC по Likelihood Of Attack
